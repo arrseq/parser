@@ -1,4 +1,6 @@
-use parser::{Builder, Parsable};
+#![feature(round_char_boundary)]
+
+use parser::{Parser, Parsable};
 
 enum Operator {
     Add,
@@ -8,8 +10,8 @@ enum Operator {
 }
 
 impl Parsable for Operator {
-    fn parse(mut builder: Builder) -> Self {
-        builder.test(|char| char == 'a');
+    fn parse(mut parser: &mut Parser) -> Self {
+        parser.test(|char| char == 'a');
         Operator::Add
     }
 }
@@ -28,7 +30,8 @@ impl Parsable for Operator {
 
 fn main() {
     let source = r#"abc"#;
-    let mut builder = Builder::new(source);
+    let mut builder = Parser::new(source);
     
-    dbg!(builder.parse::<Operator>());
+    dbg!("Бbc".ceil_char_boundary(1));
+    // dbg!(builder.parse::<Operator>());
 }

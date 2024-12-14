@@ -1,15 +1,18 @@
 use alloc::rc::{Rc, Weak};
 use core::cell::RefCell;
+use core::str::CharIndices;
 use thiserror::Error;
 
 #[cfg(test)]
 mod test;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Span<'a> {
+    slice_bounds: [usize; 2],
+    indices: CharIndices<'a>,
     /// Position of span in respect to the source.
     /// This is the start and end indexes of the slice in reference to the source string.
-    pub bounds: [usize; 2],
+    bounds: [usize; 2],
     parent: Option<Weak<RefCell<Self>>>,
     latest_child: Option<Rc<RefCell<Self>>>,
     /// Whether a sibling was created after this. If so, this span cannot be resized.
@@ -26,7 +29,18 @@ pub enum Error {
     ParentDeallocated
 }
 
-impl Span<'_> {
+impl<'a> Span<'a> {
+    pub fn new(char_indices: CharIndices<'a>) -> Self {
+        Self {
+            slice_bounds: [0; 2],
+            indices: char_indices,
+            bounds: [0; 2],
+            parent: None,
+            latest_child: None,
+            blocked: false
+        }
+    }
+    
     /// Grow the span by `amount`.
     /// 
     /// # Result
@@ -46,6 +60,10 @@ impl Span<'_> {
             })
         } else { Ok(()) }
     }
+    
+    pub fn as_bounds(&self) -> [usize; 2] {
+        self.bounds
+    }
 }
 
 pub(super) trait BranchSpan {
@@ -63,6 +81,8 @@ impl BranchSpan for Rc<RefCell<Span<'_>>> {
         } else { self_span.bounds[0] };
         
         let child = Self::new(RefCell::new(Span {
+            indices: self_span.indices.clone(),
+            slice_bounds: [self_span.slice_bounds[0]; 2],
             bounds: [start; 2],
             parent: Some(Rc::downgrade(self)),
             latest_child: None,

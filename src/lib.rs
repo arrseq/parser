@@ -1,6 +1,8 @@
 #![no_std]
 #![allow(clippy::result_unit_err)]
 
+#![feature(round_char_boundary)]
+
 extern crate alloc;
 
 pub mod span;
@@ -12,16 +14,17 @@ use core::str::Chars;
 use crate::span::{BranchSpan, Span};
 
 pub struct Node<'a, Supplementary> {
-    span: Span<'a>,
+    bounds: [usize; 2],
+    slice: &'a str,
     supplementary: Supplementary
 }
 
-pub struct Builder<'a> {
+pub struct Parser<'a> {
     chars: Rc<RefCell<Peekable<Chars<'a>>>>,
     span: Rc<RefCell<Span<'a>>>
 }
 
-impl<'a> Builder<'a> {
+impl<'a> Parser<'a> {
     pub fn derive(&self) -> Self {
         Self {
             chars: self.chars.clone(),
@@ -43,11 +46,17 @@ impl<'a> Builder<'a> {
         Some(chars.next().unwrap())
     }
     
-    pub fn parse<Type: Parsable>(&mut self) {
+    pub fn parse<Type: Parsable>(&mut self) -> Node<'_, Type> {
+        let supplementary = Type::parse(self);
+        // Node {
+        //     bounds: self.span.borrow().as_bounds(),
+        //     supplementary
+        // }
         
+        todo!()
     }
 }
 
 pub trait Parsable {
-    fn parse(builder: Builder) -> Self;
+    fn parse(parser: &mut Parser) -> Self;
 }
