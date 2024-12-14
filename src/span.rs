@@ -8,12 +8,21 @@ mod test;
 
 #[derive(Debug)]
 pub struct Span<'a> {
-    pub slice_bounds: [usize; 2],
+    /// Bounds of bytes in source slice that correspond to the [`bounds`] field.
+    slice_bounds: [usize; 2],
     indices: Rc<RefCell<CharIndices<'a>>>,
     /// Position of span in respect to the source.
     /// This is the start and end indexes of the slice in reference to the source string.
     bounds: [usize; 2],
+    /// Parent span that this current span was derived from. 
+    /// 
+    /// This is stored to expand the parent when the child expands because the parent must encompass
+    /// the child spans.
     parent: Option<Weak<RefCell<Self>>>,
+    /// Last child of this span. 
+    /// 
+    /// This is stored so that it can be blocked when a new child is added to this span. it is 
+    /// unwanted behavior to allow older spans to resize.
     latest_child: Option<Rc<RefCell<Self>>>,
     /// Whether a sibling was created after this. If so, this span cannot be resized.
     blocked: bool
@@ -55,15 +64,28 @@ impl<'a> Span<'a> {
     fn backpropagation_expand(&mut self, amount: usize, parent_slice_end: Option<usize>) -> Result<(), Error> {
         if self.blocked { return Err(Error::BlockedResize) }
         
-        self.bounds[1] += amount;
         if let Some(slice_end) = parent_slice_end {
             self.slice_bounds[1] = slice_end;
         } else {
             let mut indices = self.indices.borrow_mut();
+            // Save snapshots of fields to reset this to its original state in case of an out of 
+            // bounds error.
+            let old_indices = indices.clone();
+            let old_slice_end = self.slice_bounds[1];
+            
             for _ in 0..amount { 
-                self.slice_bounds[1] += indices.next().ok_or(Error::OutOfBounds)?.1.len_utf8();
+                let Some(next) = indices.next() else {
+                    println!("failed");
+                    
+                    *indices = old_indices;
+                    self.slice_bounds[1] = old_slice_end;
+                    return Err(Error::OutOfBounds);
+                };
+                self.slice_bounds[1] += next.1.len_utf8();
             }
         }
+
+        self.bounds[1] += amount;
 
         if let Some(parent) = &self.parent {
             let parent = parent.upgrade().ok_or(Error::ParentDeallocated)?;
@@ -71,7 +93,6 @@ impl<'a> Span<'a> {
             Err(match result {
                 Err(Error::BlockedResize | Error::BlockedParentResize) => Error::BlockedParentResize,
                 Err(Error::ParentDeallocated) => Error::ParentDeallocated,
-                // TODO: Update error message
                 Err(Error::OutOfBounds) => unreachable!("Out of bounds is only given if called with 'parent_slice_end' being 'None'"),
                 Ok(_) => return Ok(())
             })

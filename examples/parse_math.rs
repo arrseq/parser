@@ -40,10 +40,12 @@ fn main() {
 
     let source = "Бbcd";
     let mut span = Rc::new(RefCell::new(Span::new(source.char_indices())));
-    span.borrow_mut().expand(1);
+    span.borrow_mut().expand(3);
     
     let inner = span.derive();
-    inner.borrow_mut().expand(2).expect("WHAT");
+    if let Err(_) = inner.borrow_mut().expand(2) {
+        println!("error");
+    };
     dbg!(&source[span.borrow().slice_bounds[0]..span.borrow().slice_bounds[1]]);
     dbg!(&source[inner.borrow().slice_bounds[0]..inner.borrow().slice_bounds[1]]);
 }
