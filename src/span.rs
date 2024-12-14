@@ -11,6 +11,7 @@ mod test;
 pub struct Span<'a> {
     /// Bounds of bytes in source slice that correspond to the [`bounds`] field.
     slice_bounds: [usize; 2],
+    #[getter(skip)]
     indices: Rc<RefCell<CharIndices<'a>>>,
     /// Position of span in respect to the source.
     /// This is the start and end indexes of the slice in reference to the source string.
@@ -19,11 +20,13 @@ pub struct Span<'a> {
     /// 
     /// This is stored to expand the parent when the child expands because the parent must encompass
     /// the child spans.
+    #[getter(skip)]
     parent: Option<Weak<RefCell<Self>>>,
     /// Last child of this span. 
     /// 
     /// This is stored so that it can be blocked when a new child is added to this span. it is 
     /// unwanted behavior to allow older spans to resize.
+    #[getter(skip)]
     latest_child: Option<Rc<RefCell<Self>>>,
     /// Whether a sibling was created after this. If so, this span cannot be resized.
     blocked: bool
