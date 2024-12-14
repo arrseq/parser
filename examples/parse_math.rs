@@ -43,7 +43,7 @@ fn main() {
     span.borrow_mut().expand(1);
     
     let inner = span.derive();
-    inner.borrow_mut().expand(1);
+    inner.borrow_mut().expand(2).expect("WHAT");
     dbg!(&source[span.borrow().slice_bounds[0]..span.borrow().slice_bounds[1]]);
     dbg!(&source[inner.borrow().slice_bounds[0]..inner.borrow().slice_bounds[1]]);
 }

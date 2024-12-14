@@ -26,7 +26,9 @@ pub enum Error {
     #[error("Resizing when one or more parents are blocked")]
     BlockedParentResize,
     #[error("At least one parent span was deallocated")]
-    ParentDeallocated
+    ParentDeallocated,
+    #[error("Bound exceeds length of source")]
+    OutOfBounds
 }
 
 impl<'a> Span<'a> {
@@ -47,21 +49,30 @@ impl<'a> Span<'a> {
     /// [`Err(())`] is returned if the span is blocked in from resizing, otherwise [`Ok(())`] is 
     /// returned.
     pub fn expand(&mut self, amount: usize) -> Result<(), Error> {
+        self.backpropagation_expand(amount, None)
+    }
+    
+    fn backpropagation_expand(&mut self, amount: usize, parent_slice_end: Option<usize>) -> Result<(), Error> {
         if self.blocked { return Err(Error::BlockedResize) }
         
         self.bounds[1] += amount;
-        {
-            /// FIXME: Handle unwrap
+        if let Some(slice_end) = parent_slice_end {
+            self.slice_bounds[1] = slice_end;
+        } else {
             let mut indices = self.indices.borrow_mut();
-            for index in 0..amount { self.slice_bounds[1] += indices.next().unwrap().1.len_utf8(); }
+            for _ in 0..amount { 
+                self.slice_bounds[1] += indices.next().ok_or(Error::OutOfBounds)?.1.len_utf8();
+            }
         }
 
         if let Some(parent) = &self.parent {
             let parent = parent.upgrade().ok_or(Error::ParentDeallocated)?;
-            let result = parent.borrow_mut().expand(amount);
+            let result = parent.borrow_mut().backpropagation_expand(amount, Some(self.slice_bounds[1]));
             Err(match result {
                 Err(Error::BlockedResize | Error::BlockedParentResize) => Error::BlockedParentResize,
                 Err(Error::ParentDeallocated) => Error::ParentDeallocated,
+                // TODO: Update error message
+                Err(Error::OutOfBounds) => unreachable!("Out of bounds is only given if called with 'parent_slice_end' being 'None'"),
                 Ok(_) => return Ok(())
             })
         } else { Ok(()) }
