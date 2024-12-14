@@ -1,12 +1,13 @@
 use alloc::rc::{Rc, Weak};
 use core::cell::RefCell;
 use core::str::CharIndices;
+use derive_getters::Getters;
 use thiserror::Error;
 
 #[cfg(test)]
 mod test;
 
-#[derive(Debug)]
+#[derive(Debug, Getters)]
 pub struct Span<'a> {
     /// Bounds of bytes in source slice that correspond to the [`bounds`] field.
     slice_bounds: [usize; 2],
