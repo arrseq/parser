@@ -10,11 +10,13 @@ mod test;
 #[derive(Debug, Getters)]
 pub struct Span<'a> {
     /// Bounds of bytes in source slice that correspond to the [`bounds`] field.
+    #[getter(copy)]
     slice_bounds: [usize; 2],
     #[getter(skip)]
     indices: Rc<RefCell<CharIndices<'a>>>,
     /// Position of span in respect to the source.
     /// This is the start and end indexes of the slice in reference to the source string.
+    #[getter(copy)]
     bounds: [usize; 2],
     /// Parent span that this current span was derived from. 
     /// 
@@ -29,6 +31,7 @@ pub struct Span<'a> {
     #[getter(skip)]
     latest_child: Option<Rc<RefCell<Self>>>,
     /// Whether a sibling was created after this. If so, this span cannot be resized.
+    #[getter(copy)]
     blocked: bool
 }
 
