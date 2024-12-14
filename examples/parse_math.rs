@@ -1,6 +1,9 @@
 #![feature(round_char_boundary)]
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use parser::{Parser, Parsable};
+use parser::span::{BranchSpan, Span};
 
 enum Operator {
     Add,
@@ -29,9 +32,18 @@ impl Parsable for Operator {
 // }
 
 fn main() {
-    let source = r#"abc"#;
-    let mut builder = Parser::new(source);
-    
-    dbg!("Бbc".ceil_char_boundary(1));
+    // let source = r#"abc"#;
+    // let mut builder = Parser::new(source);
+    // 
+    // dbg!("Бbc".ceil_char_boundary(1));
     // dbg!(builder.parse::<Operator>());
+
+    let source = "Бbcd";
+    let mut span = Rc::new(RefCell::new(Span::new(source.char_indices())));
+    span.borrow_mut().expand(1);
+    
+    let inner = span.derive();
+    inner.borrow_mut().expand(1);
+    dbg!(&source[span.borrow().slice_bounds[0]..span.borrow().slice_bounds[1]]);
+    dbg!(&source[inner.borrow().slice_bounds[0]..inner.borrow().slice_bounds[1]]);
 }

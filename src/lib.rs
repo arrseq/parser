@@ -1,4 +1,4 @@
-#![no_std]
+// #![no_std]
 #![allow(clippy::result_unit_err)]
 
 #![feature(round_char_boundary)]
@@ -35,7 +35,7 @@ impl<'a> Parser<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             chars: Rc::new(RefCell::new(source.chars().peekable())),
-            span: Rc::new(RefCell::new(Span::default()))
+            span: Rc::new(RefCell::new(Span::new(source.char_indices())))
         }
     }
 
