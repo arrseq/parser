@@ -3,8 +3,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use parser::{Parser, Parsable};
-use parser::span::{BranchSpan, Span};
 
+#[derive(Debug)]
 enum Operator {
     Add,
     Subtract,
@@ -12,40 +12,34 @@ enum Operator {
     Divide
 }
 
-impl Parsable for Operator {
-    fn parse(mut parser: &mut Parser) -> Self {
-        parser.test(|char| char == 'a');
-        Operator::Add
+#[derive(Debug)]
+struct Hi {}
+
+impl Parsable for Hi {
+    fn parse(parser: &mut Parser) -> Self {
+        parser.expect_char('h').expect("expected h");
+        parser.expect_char('i').expect("expected i");
+        
+        Self {}
     }
 }
 
-// #[derive(CharacterNode)]
-// enum Operator {
-//     #[character("+")]
-//     Add,
-//     #[character("-")]
-//     Subtract,
-//     #[character("*")]
-//     Multiply,
-//     #[character("/")]
-//     Divide
-// }
+impl Parsable for Operator {
+    fn parse(parser: &mut Parser) -> Self {
+        parser.parse::<Hi>();
+        
+        if let Ok(_) = parser.expect_char('+') { Self::Add }
+        else if let Ok(_) = parser.expect_char('-') { Self::Subtract }
+        else if let Ok(_) = parser.expect_char('*') { Self::Multiply }
+        else if let Ok(_) = parser.expect_char('/') { Self::Divide }
+        else { Operator::Add }
+    }
+}
 
 fn main() {
-    // let source = r#"abc"#;
-    // let mut builder = Parser::new(source);
-    // 
-    // dbg!("Бbc".ceil_char_boundary(1));
-    // dbg!(builder.parse::<Operator>());
-
-    let source = "Бbcd";
-    let mut span = Rc::new(RefCell::new(Span::new(source.char_indices())));
-    span.borrow_mut().expand(3);
+    let source = r#"hi*"#;
+    let mut builder = Parser::new(source);
     
-    let inner = span.derive();
-    if let Err(_) = inner.borrow_mut().expand(2) {
-        println!("error");
-    };
-    dbg!(&source[span.borrow().slice_bounds()[0]..span.borrow().slice_bounds()[1]]);
-    dbg!(&source[inner.borrow().slice_bounds()[0]..inner.borrow().slice_bounds()[1]]);
+    dbg!(builder.parse_to_char('*'));
+    // dbg!(builder.parse::<Operator>());
 }
