@@ -1,5 +1,6 @@
 use alloc::rc::{Rc, Weak};
 use core::cell::RefCell;
+use core::ops::Range;
 use core::str::CharIndices;
 use derive_getters::Getters;
 use thiserror::Error;
@@ -10,14 +11,12 @@ mod test;
 #[derive(Debug, Getters)]
 pub struct Span<'a> {
     /// Bounds of bytes in source slice that correspond to the [`bounds`] field.
-    #[getter(copy)]
-    slice_bounds: [usize; 2],
+    slice_bounds: Range<usize>,
     #[getter(skip)]
     indices: Rc<RefCell<CharIndices<'a>>>,
     /// Position of span in respect to the source.
     /// This is the start and end indexes of the slice in reference to the source string.
-    #[getter(copy)]
-    bounds: [usize; 2],
+    bounds: Range<usize>,
     /// Parent span that this current span was derived from. 
     /// 
     /// This is stored to expand the parent when the child expands because the parent must encompass
@@ -50,9 +49,9 @@ pub enum Error {
 impl<'a> Span<'a> {
     pub fn new(char_indices: CharIndices<'a>) -> Self {
         Self {
-            slice_bounds: [0; 2],
+            slice_bounds: 0..0,
             indices: Rc::new(RefCell::new(char_indices)),
-            bounds: [0; 2],
+            bounds: 0..0,
             parent: None,
             latest_child: None,
             blocked: false
@@ -72,31 +71,31 @@ impl<'a> Span<'a> {
         if self.blocked { return Err(Error::BlockedResize) }
         
         if let Some(slice_end) = parent_slice_end {
-            self.slice_bounds[1] = slice_end;
+            self.slice_bounds.end = slice_end;
         } else {
             let mut indices = self.indices.borrow_mut();
             // Save snapshots of fields to reset this to its original state in case of an out of 
             // bounds error.
             let old_indices = indices.clone();
-            let old_slice_end = self.slice_bounds[1];
+            let old_slice_end = self.slice_bounds.end;
             
             for _ in 0..amount { 
                 let Some(next) = indices.next() else {
                     println!("failed");
                     
                     *indices = old_indices;
-                    self.slice_bounds[1] = old_slice_end;
+                    self.slice_bounds.end = old_slice_end;
                     return Err(Error::OutOfBounds);
                 };
-                self.slice_bounds[1] += next.1.len_utf8();
+                self.slice_bounds.end += next.1.len_utf8();
             }
         }
 
-        self.bounds[1] += amount;
+        self.bounds.end += amount;
 
         if let Some(parent) = &self.parent {
             let parent = parent.upgrade().ok_or(Error::ParentDeallocated)?;
-            let result = parent.borrow_mut().backpropagation_expand(amount, Some(self.slice_bounds[1]));
+            let result = parent.borrow_mut().backpropagation_expand(amount, Some(self.slice_bounds.end));
             Err(match result {
                 Err(Error::BlockedResize | Error::BlockedParentResize) => Error::BlockedParentResize,
                 Err(Error::ParentDeallocated) => Error::ParentDeallocated,
@@ -105,9 +104,18 @@ impl<'a> Span<'a> {
             })
         } else { Ok(()) }
     }
+}
 
-    pub fn as_bounds(&self) -> [usize; 2] {
-        self.bounds
+impl Clone for Span<'_> {
+    fn clone(&self) -> Self {
+        Self {
+            slice_bounds: self.slice_bounds.clone(),
+            indices: Rc::new(RefCell::clone(&self.indices)),
+            bounds: self.bounds.clone(),
+            parent: self.parent.clone(),
+            latest_child: self.latest_child.clone(),
+            blocked: self.blocked
+        }
     }
 }
 
@@ -122,13 +130,13 @@ impl BranchSpan for Rc<RefCell<Span<'_>>> {
         let start = if let Some(last_child) = &self_span.latest_child {
             let mut borrowed = last_child.borrow_mut();
             borrowed.blocked = true;
-            borrowed.bounds[1]
-        } else { self_span.bounds[1] };
+            borrowed.bounds.end
+        } else { self_span.bounds.end };
         
         let child = Self::new(RefCell::new(Span {
             indices: self_span.indices.clone(),
-            slice_bounds: [self_span.slice_bounds[1]; 2],
-            bounds: [start; 2],
+            slice_bounds: self_span.slice_bounds.end..self_span.slice_bounds.end,
+            bounds: start..start,
             parent: Some(Rc::downgrade(self)),
             latest_child: None,
             blocked: false

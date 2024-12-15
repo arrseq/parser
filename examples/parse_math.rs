@@ -1,45 +1,45 @@
-#![feature(round_char_boundary)]
-
-use std::cell::RefCell;
-use std::rc::Rc;
-use parser::{Parser, Parsable};
+use parser::{Parser, Parsable, Node};
 
 #[derive(Debug)]
-enum Operator {
-    Add,
-    Subtract,
-    Multiply,
-    Divide
+struct VariableDeclaration {
+    // name: Node<Ident>
 }
 
 #[derive(Debug)]
-struct Hi {}
+pub enum VarError {
+    ExpectedLet
+}
 
-impl Parsable for Hi {
-    fn parse(parser: &mut Parser) -> Self {
-        parser.expect_char('h').expect("expected h");
-        parser.expect_char('i').expect("expected i");
-        
-        Self {}
+#[derive(Debug)]
+struct Ident {}
+
+impl Parsable for Ident {
+    type Error = ();
+
+    fn parse(parser: &mut Parser) -> Result<Self, Self::Error> {
+        parser.parse_while(|char| char != ' ');
+        Ok(Ident {})
     }
 }
 
-impl Parsable for Operator {
-    fn parse(parser: &mut Parser) -> Self {
-        parser.parse::<Hi>();
+impl Parsable for VariableDeclaration {
+    type Error = VarError;
+    
+    fn parse(parser: &mut Parser) -> Result<Self, VarError> {
+        let keyword = parser.parse_while(|char| char != ' ');
+        if keyword != "let" { return Err(VarError::ExpectedLet) }
+        // parser.expect_char(' ');
+        // let name = parser.parse::<Ident>().unwrap();
+        // Ok(Self { name })
         
-        if let Ok(_) = parser.expect_char('+') { Self::Add }
-        else if let Ok(_) = parser.expect_char('-') { Self::Subtract }
-        else if let Ok(_) = parser.expect_char('*') { Self::Multiply }
-        else if let Ok(_) = parser.expect_char('/') { Self::Divide }
-        else { Operator::Add }
+        Ok(Self {})
     }
 }
 
 fn main() {
-    let source = r#"hi*"#;
-    let mut builder = Parser::new(source);
-    
-    dbg!(builder.parse_to_char('*'));
-    // dbg!(builder.parse::<Operator>());
+    let source = r#"let x = 10;"#;
+    let mut parser = Parser::new(source);
+
+    let var = parser.parse::<VariableDeclaration>().unwrap();
+    dbg!(var.slice());
 }
