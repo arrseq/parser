@@ -15,8 +15,9 @@ struct Ident {}
 
 impl Parsable for Ident {
     type Error = ();
-
-    fn parse(parser: &mut Parser) -> Result<Self, Self::Error> {
+    type Data = ();
+    
+    fn parse(parser: &mut Parser, data: &mut Self::Data) -> Result<Self, Self::Error> {
         parser.parse_while(|char| char != ' ');
         Ok(Ident {})
     }
@@ -24,13 +25,15 @@ impl Parsable for Ident {
 
 impl Parsable for VariableDeclaration {
     type Error = VarError;
+    type Data = ();
     
-    fn parse(parser: &mut Parser) -> Result<Self, VarError> {
+    fn parse(parser: &mut Parser, data: &mut Self::Data) -> Result<Self, VarError> {
         let keyword = parser.parse_while(|char| char != ' ');
         if keyword != "let" { return Err(VarError::ExpectedLet) }
-        // parser.expect_char(' ');
-        // let name = parser.parse::<Ident>().unwrap();
-        // Ok(Self { name })
+        parser.expect_char(' ');
+        let name = parser.parse::<Ident>(data).unwrap();
+        
+        dbg!(name);
         
         Ok(Self {})
     }
@@ -40,6 +43,13 @@ fn main() {
     let source = r#"let x = 10;"#;
     let mut parser = Parser::new(source);
 
-    let var = parser.parse::<VariableDeclaration>().unwrap();
+    let var = parser.parse::<VariableDeclaration>(&mut ()).unwrap();
     dbg!(var.slice());
 }
+
+// 
+//  
+// 
+// 
+// 
+// 
