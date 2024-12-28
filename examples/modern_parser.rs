@@ -1,30 +1,49 @@
+#![feature(adt_const_params)]
+
 use parser::{Node, Parsable, Parser};
 use parser::error::Error;
 
-struct VariableDeclaration {
-    inner: Option<Box<Node<VariableDeclaration>>>
-}
+#[derive(Debug)]
+struct Ident {}
 
-impl Parsable for VariableDeclaration {
+impl Parsable for Ident {
     type Error = ();
     
     fn parse(parser: &mut Parser) -> Result<Self, Error<Self::Error>> {
-        let out = if let Ok(_) = parser.expect_char('h') {
-            Some(Box::new(parser.parse::<VariableDeclaration>().unwrap()))
-        } else { None };
-        Ok(Self { inner: out })
+        parser.parse_while(|c| c.is_alphabetic());
+        Ok(Self {})
+    }
+}
+
+#[derive(Debug)]
+struct WhiteSpace {}
+
+impl Parsable for WhiteSpace {
+    type Error = ();
+
+    fn parse(parser: &mut Parser) -> Result<Self, Error<Self::Error>> {
+        dbg!(parser.parse_while(|c| c.is_whitespace()));
+        Ok(Self {})
+    }
+}
+
+#[derive(Debug)]
+struct Keyword {}
+
+impl Parsable for Keyword {
+    type Error = ();
+
+    fn parse(parser: &mut Parser) -> Result<Self, Error<Self::Error>> {
+        todo!()
     }
 }
 
 fn main() {
-    let source = r#"hhhllo + world"#;
+    let source = r#"hhhllo world"#;
     let mut parser = Parser::new(source);
     
-    // Internal behavior:
-    // - create parser fork with start = self.start.
-    // - call parse with fork
-    // - take length of fork parser and add it to self.length
-    // - end
-    let res = parser.parse::<VariableDeclaration>().unwrap();
-    dbg!(res.slice());
+    dbg!(parser.parse::<Ident>().unwrap().slice());
+    dbg!(parser.parse::<WhiteSpace>().unwrap().slice());
+    dbg!(parser.parse::<Ident>().unwrap().slice());
+    dbg!(parser.parse::<WhiteSpace>().unwrap().slice());
 }

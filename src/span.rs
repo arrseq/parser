@@ -14,9 +14,13 @@ impl Span {
             // TODO: Check for overflow
             start: self.start + self.length,
             length: 0,
-            byte_start: self.byte_start + self.byte_length,
+            byte_start: self.byte_end(),
             byte_length: 0
         }
+    }
+    
+    pub fn byte_end(&self) -> usize {
+        self.byte_start + self.byte_length
     }
     
     pub fn expand(&mut self, char: char) {
@@ -27,7 +31,7 @@ impl Span {
     pub fn byte_range(&self) -> Range<usize> {
         Range {
             start: self.byte_start,
-            end: self.byte_start + self.byte_length
+            end: self.byte_end()
         }
     }
 }
