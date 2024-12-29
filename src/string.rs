@@ -7,6 +7,32 @@ use indexmap::IndexMap;
 pub type StringsMap<Token> = IndexMap<alloc::string::String, Token>;
 pub type Strings<Token> = Rc<RefCell<StringsMap<Token>>>;
 
+pub struct TokenGuard<'a, Token> {
+    borrow: Ref<'a, StringsMap<Token>>,
+    index: usize
+}
+
+impl<Token> Deref for TokenGuard<'_, Token> {
+    type Target = Token;
+
+    fn deref(&self) -> &Self::Target {
+        &self.borrow[self.index]
+    }
+}
+
+pub struct SliceGuard<'a, Token> {
+    borrow: Ref<'a, StringsMap<Token>>,
+    index: usize
+}
+
+impl<Token> Deref for SliceGuard<'_, Token> {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.borrow.get_index(self.index).unwrap().0
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct String<'a, Token> {
     pub(super) strings: Strings<Token>,
@@ -46,10 +72,16 @@ impl<'a, Token> String<'a, Token> {
         }
     }
     
-    pub fn token(&mut self) -> Option<TokenGuard<'a, Token>> {
+    pub fn token(&mut self) -> Option<TokenGuard<'_, Token>> {
         self.set_owned();
-        // self.strings.borrow().entry(self.slice.owne)
-        todo!()
+        let Cow::Owned(string) = &self.slice else { unreachable!() };
+        let borrow = self.strings.borrow();
+        let index = borrow.get_full(string)?.0;
+        
+        Some(TokenGuard {
+            borrow,
+            index
+        })
     }
 }
 
@@ -73,22 +105,16 @@ pub struct Intern<Token> {
     pub(super) index: usize
 }
 
-pub struct TokenGuard<'a, Token> {
-    borrow: Ref<'a, StringsMap<Token>>,
-    index: usize
-}
-
-impl<Token> Deref for TokenGuard<'_, Token> {
-    type Target = Token;
-
-    fn deref(&self) -> &Self::Target {
-        &self.borrow[self.index]
-    }
-}
-
 impl<Token> Intern<Token> {
     pub fn token(&self) -> TokenGuard<'_, Token> {
         TokenGuard {
+            borrow: self.strings.borrow(),
+            index: self.index
+        }
+    }
+    
+    pub fn slice(&self) -> SliceGuard<'_, Token> {
+        SliceGuard {
             borrow: self.strings.borrow(),
             index: self.index
         }

@@ -37,7 +37,10 @@ struct Data {
     hello: InternString<Token>
 }
 
-struct SomeAst {}
+#[derive(Debug)]
+struct SomeAst {
+    first_word: InternString<Token>
+}
 
 impl Parsable for SomeAst {
     type Error = ();
@@ -46,15 +49,10 @@ impl Parsable for SomeAst {
 
     fn parse(parser: &mut Parser<Self::Token>, data: &mut Self::Data) -> Result<Self, Error<Self::Error>> {
         let mut ps = parser.parse_while(|c| c.is_alphabetic());
-        dbg!(&*ps);
-        let is = ps.try_internalize(|| Some(Token::Identifier)).unwrap();
-        let token = is.token();
         
-        // let token = ps.token().unwrap();
-        
-        dbg!(*token);
-        
-        Ok(SomeAst {})
+        Ok(SomeAst {
+            first_word: ps.try_internalize(|| Some(Token::Identifier)).unwrap()
+        })
     }
 }
 
@@ -66,7 +64,7 @@ fn main() {
     parser.internalize("+", Token::Plus).unwrap();
     parser.internalize("world", Token::World).unwrap();
     
-    parser.parse::<SomeAst>(&mut ());
-    
-    
+    let ast = parser.parse::<SomeAst>(&mut ()).unwrap();
+    let fw = ast.first_word.slice();
+    dbg!(&*fw);
 }
