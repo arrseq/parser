@@ -3,6 +3,7 @@
 
 #![feature(round_char_boundary)]
 #![feature(new_range_api)]
+#![feature(let_chains)]
 extern crate alloc;
 extern crate core;
 

@@ -57,7 +57,7 @@ impl Parsable for SomeAst {
 }
 
 fn main() {
-    let source = "hello+world";
+    let source = "world+world";
     let mut parser = Parser::<Token>::new(source);
     
     parser.internalize("hello", Token::Hello).unwrap();
@@ -65,6 +65,6 @@ fn main() {
     parser.internalize("world", Token::World).unwrap();
     
     let ast = parser.parse::<SomeAst>(&mut ()).unwrap();
-    let fw = ast.first_word.slice();
+    let fw = ast.first_word.token();
     dbg!(&*fw);
 }
