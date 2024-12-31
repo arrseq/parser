@@ -28,10 +28,13 @@ impl Span {
     /// Results in an error if the calculation to determine the new start position results in an 
     /// overflow.
     pub fn at_end(&self) -> Result<Self, ArithmeticOverflow> {
+        // Check to see if the byte range will overflow.
+        self.byte_start.checked_add(self.byte_length).ok_or(ArithmeticOverflow)?;
+        
         Ok(Self {
             start: self.start.checked_add(self.length).ok_or(ArithmeticOverflow)?,
             length: 0,
-            byte_start: self.byte_end()?,
+            byte_start: self.byte_end(),
             byte_length: 0
         })
     }
@@ -41,8 +44,8 @@ impl Span {
     /// # Usage
     /// Used by this span function to find where a new span could start at if the [Span::at_end] 
     /// method is used.
-    pub fn byte_end(&self) -> Result<usize, ArithmeticOverflow> {
-        self.byte_start.checked_add(self.byte_length).ok_or(ArithmeticOverflow)
+    pub fn byte_end(&self) -> usize {
+        self.byte_start + self.byte_length
     }
     
     /// Expand the span to cover another character.
@@ -75,7 +78,7 @@ impl Span {
             // The call to calculate the byte end position should not fail because
             // - expanding this type will cause an error if the length can result in an overflow.
             // - when newly initialized, the lengths are 0 which cannot result in an overflow.
-            end: self.byte_end().unwrap()
+            end: self.byte_end()
         }
     }
 }

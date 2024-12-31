@@ -20,7 +20,7 @@ use indexmap::IndexMap;
 use indexmap::map::Entry;
 use thiserror::Error;
 use crate::error::Error;
-use crate::span::Span;
+use crate::span::{ArithmeticOverflow, Span};
 
 pub use string::String as ParserString;
 pub use string::Intern as InternString;
@@ -87,13 +87,13 @@ pub enum InternalizeError {
 }
 
 impl<'a, Token> Parser<'a, Token> {
-    pub fn derive(&self) -> Self {
-        Self {
+    pub fn derive(&self) -> Result<Self, ArithmeticOverflow> {
+        Ok(Self {
             source: self.source.clone(),
             chars: self.chars.clone(),
-            span: self.span.at_end(),
+            span: self.span.at_end()?,
             strings: self.strings.clone()
-        }
+        })
     }
     
     pub fn new(source: &'a str) -> Self {
@@ -118,7 +118,10 @@ impl<'a, Token> Parser<'a, Token> {
     
     pub fn parse_while(&mut self, mut predicate: impl FnMut(char) -> bool) -> ParserString<'_, Token> {
         let mut chars = self.chars.borrow_mut();
-        let mut slice_bounds = self.span.byte_end()..self.span.byte_end();
+        let mut slice_bounds = {
+            let byte_end = self.span.byte_end();
+            byte_end..byte_end
+        };
         
         loop {
             let Some(peeked) = chars.peek() else { break };
@@ -153,7 +156,7 @@ impl<'a, Token> Parser<'a, Token> {
     }
     
     pub fn parse<Type: Parsable<Token=Token> + 'static>(&mut self, data: &mut Type::Data) -> Result<Node<Type>, Error<Type::Error>> {
-        let mut fork = self.derive();
+        let mut fork = self.derive().map_err(Error::ArithmeticOverflow)?;
         let supplementary = Type::parse(&mut fork, data)?;
         self.span.length += fork.span.length;
         self.span.byte_length += fork.span.byte_length;
