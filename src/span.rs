@@ -56,12 +56,33 @@ impl Span {
     /// # Usage
     /// Used to include a character that was parsed.
     pub fn expand(&mut self, char: char) -> Result<(), ArithmeticOverflow> {
+        self.add_lengths(self.expanded_lengths(char)?);
+        Ok(())
+    }
+    
+    /// Add the byte and character length to this span. The result of the calculations are 
+    /// unchecked.
+    /// 
+    /// # Privacy
+    /// This method is kept private because it may result in an overflow and the lengths may become 
+    /// meaningless.
+    pub(super) fn add_lengths(&mut self, lengths: [usize; 2]) {
+        self.length = self.length.overflowing_add(lengths[0]).0;
+        self.byte_length = self.byte_length.overflowing_add(lengths[1]).0;
+    }
+    
+    /// Get the new lengths of this if an extra char was included.
+    /// 
+    /// # Result
+    /// If successful, an array is returned where the first value is the character length and the 
+    /// second is the byte length.
+    /// 
+    /// # Error
+    /// If the expanded form results in an overflow either in the byte or character lengths.
+    pub(super) fn expanded_lengths(&self, char: char) -> Result<[usize; 2], ArithmeticOverflow> {
         if let Some(byte_length) = self.byte_length.checked_add(char.len_utf8())
             && let Some(length) = self.length.checked_add(1) {
-            self.byte_length = byte_length;
-            self.length = length;
-            
-            Ok(())
+            Ok([length, byte_length])
         } else {
             Err(ArithmeticOverflow)
         }

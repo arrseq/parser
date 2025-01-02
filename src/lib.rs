@@ -109,11 +109,25 @@ impl<'a, Token> Parser<'a, Token> {
         let mut chars = self.chars.borrow_mut();
         let peeked = *chars.peek().ok_or(ExpectError::Unexpected)?;
         let true = char == peeked else { return Err(ExpectError::Unexpected) };
-        
-        self.span.expand(peeked);
+
+        Self::expand_internal_character(&mut self.span, peeked);
         chars.next();
         
         Ok(())
+    }
+
+    /// Expand the span by a character that was read from this string that want used to expand this 
+    /// string previously.
+    /// 
+    /// This is ok to do only if the specific instance of that character was used by this function 
+    /// once because
+    /// - The byte length of the span will always be valid because it uses the same type to 
+    ///   index the string
+    /// - The character length will never be larger than the byte length because every characters 
+    ///   byte length is greater than one
+    #[inline]
+    fn expand_internal_character(span: &mut Span, char: char) {
+        span.expand(char).unwrap()
     }
     
     pub fn parse_while(&mut self, mut predicate: impl FnMut(char) -> bool) -> ParserString<'_, Token> {
@@ -129,7 +143,8 @@ impl<'a, Token> Parser<'a, Token> {
             
             if !predicate(peeked) { break }
             let _ = chars.next();
-            self.span.expand(peeked);
+            
+            Self::expand_internal_character(&mut self.span, peeked);
             slice_bounds.end += peeked.len_utf8();
         }
         
