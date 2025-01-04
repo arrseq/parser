@@ -23,3 +23,12 @@ pub enum Error<SpecificError> {
     #[error("Syntax error in parsing content")]
     SyntaxError(SyntaxError<SpecificError>),
 }
+
+impl<SpecificError> Error<SpecificError> {
+    pub fn new_syntax_temp() -> Self {
+        Self::SyntaxError(SyntaxError {
+            kind: ErrorKind::Unexpected,
+            span: Span::default()
+        })
+    }
+}
