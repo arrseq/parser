@@ -58,7 +58,7 @@ impl<Token> String<Token> {
         }))
     }
     
-    pub fn token(&mut self) -> Option<TokenGuard<'_, Token>> {
+    pub fn token(&self) -> Option<TokenGuard<'_, Token>> {
         let borrow = RefCell::borrow(&self.strings);
         
         let index = if let Some(index) = self.index {
