@@ -165,7 +165,6 @@ impl<'a, Token> Parser<'a, Token> {
         unsafe { ByteString::from_bytes_unchecked(self.source.clone().into_bytes().slice(range)) }
     }
     
-    // FIXME: Restore parser if parsing fails
     pub fn parse<Type: Parsable<Token=Token> + 'static>(&mut self, data: &mut Type::Data) -> Result<Node<Type>, Error<Type::Error>> {
         let mut fork = self.derive().map_err(Error::ArithmeticOverflow)?;
         let supplementary = Type::parse(&mut fork, data)?;
@@ -182,6 +181,15 @@ impl<'a, Token> Parser<'a, Token> {
     
     pub fn span(&self) -> &Span {
         &self.span
+    }
+}
+
+impl<Token: Clone> Parser<'_, Token> {
+    pub fn cloning_parse<Type: Parsable<Token=Token> + 'static>(&mut self, data: &mut Type::Data) -> Result<Node<Type>, Error<Type::Error>> {
+        let strings = Rc::new(RefCell::clone(&self.strings));
+        self.parse::<Type>(data).inspect_err(move |_| {
+            self.strings = strings;
+        })
     }
 }
 
