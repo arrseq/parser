@@ -8,6 +8,7 @@ use thiserror::Error;
 pub type StringsMap<Token> = IndexMap<ByteString, Token>;
 pub type Strings<Token> = Rc<RefCell<StringsMap<Token>>>;
 
+#[derive(Debug)]
 pub struct TokenGuard<'a, Token> {
     borrow: Ref<'a, StringsMap<Token>>,
     index: usize
@@ -33,7 +34,7 @@ pub struct String<Token> {
 pub struct ReInternalizationError;
 
 impl<Token> String<Token> {
-    pub fn try_internalize(&mut self, on_create: impl for<'a> FnOnce(&'a str) -> Option<Token>) -> Result<(), ReInternalizationError> {
+    pub fn try_internalize(&mut self, on_create: impl for<'a> FnOnce(&'a str) -> Option<Token>) -> Result<Option<TokenGuard<Token>>, ReInternalizationError> {
         let None = self.index else { return Err(ReInternalizationError) };
         
         let mut strings = self.strings.borrow_mut();
@@ -43,14 +44,18 @@ impl<Token> String<Token> {
             },
             indexmap::map::Entry::Vacant(mapping) => {
                 let index = mapping.index();
-                let Some(token) = on_create(&self.slice) else { return Ok(()) };
+                let Some(token) = on_create(&self.slice) else { return Ok(None) };
                 let _ = mapping.insert(token);
                 index
             }
         };
+        drop(strings);
         
         self.index = Some(index);
-        Ok(())
+        Ok(Some(TokenGuard {
+            index,
+            borrow: self.strings.borrow()
+        }))
     }
     
     pub fn token(&mut self) -> Option<TokenGuard<'_, Token>> {

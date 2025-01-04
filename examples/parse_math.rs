@@ -41,7 +41,7 @@ impl Parsable for Whitespace {
 }
 
 struct Operator {
-    operator: OperatorToken
+    operator: Option<OperatorToken>
 }
 
 impl Parsable for Operator {
@@ -54,16 +54,18 @@ impl Parsable for Operator {
         if operator.len() != 1 {
             panic!("expected operator to be exactly one character");
         }
-        
-        let token = match operator.token().as_deref().cloned() {
-            Some(t) => t,
-            None => operator.try_internalize(|| )
+        dbg!(&*operator);
+
+        let token = operator.try_internalize(|s| Some(Token::Operator(match s {
+            "+" => OperatorToken::Plus,
+            "-" => OperatorToken::Minus,
+            _ => return None
+        }))).unwrap();
+        if let Some(tk) = token {
+            println!("got token {:?}", &*tk);
         }
         
-        dbg!(&*operator);
-        let str = operator.try_internalize(|| None).unwrap();
-        
-        todo!()
+        Ok(Self { operator: None })
     }
 }
 
