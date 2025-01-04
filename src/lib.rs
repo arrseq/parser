@@ -10,12 +10,13 @@ extern crate core;
 pub mod error;
 pub mod span;
 pub mod string;
+pub mod node;
 
 use alloc::rc::Rc;
 use core::cell::RefCell;
 use core::iter::Peekable;
 use core::str::Chars;
-use std::ops::{Deref, DerefMut};
+use std::ops::{Deref, DerefMut, Range};
 use bytestring::ByteString;
 use indexmap::IndexMap;
 use indexmap::map::Entry;
@@ -35,7 +36,7 @@ pub struct Node<Supplementary> {
 
 impl<S> Node<S> {
     pub fn slice(&self) -> &'_ str {
-        &self.source.deref()[self.bounds.byte_range()]
+        &self.source
     }
 }
 
@@ -130,14 +131,15 @@ impl<'a, Token> Parser<'a, Token> {
             
             if !predicate(peeked) { break }
             let _ = chars.next();
-
+        
             self.span.overflowing_expand(peeked);
             slice_bounds.end += peeked.len_utf8();
         }
         
         ParserString {
             strings: self.strings.clone(),
-            slice: (&self.source[slice_bounds]).into(),
+            // FIXME: Bytestring not being used correctly
+            slice: self.derive_source(slice_bounds),
             index: None
         }
     }
@@ -159,17 +161,22 @@ impl<'a, Token> Parser<'a, Token> {
         })
     }
     
+    fn derive_source(&self, range: Range<usize>) -> ByteString {
+        unsafe { ByteString::from_bytes_unchecked(self.source.clone().into_bytes().slice(range)) }
+    }
+    
     // FIXME: Restore parser if parsing fails
     pub fn parse<Type: Parsable<Token=Token> + 'static>(&mut self, data: &mut Type::Data) -> Result<Node<Type>, Error<Type::Error>> {
         let mut fork = self.derive().map_err(Error::ArithmeticOverflow)?;
         let supplementary = Type::parse(&mut fork, data)?;
+        
         self.span.length += fork.span.length;
         self.span.byte_length += fork.span.byte_length;
         
         Ok(Node {
             bounds: fork.span,
             supplementary,
-            source: self.source.clone()
+            source: self.derive_source(fork.span.byte_range())
         })
     }
     
