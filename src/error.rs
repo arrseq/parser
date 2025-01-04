@@ -18,7 +18,7 @@ pub struct SyntaxError<SpecificError> {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum Error<SpecificError> {
-    #[error("Cannot parse because it would result in an overflow")]
+    #[error("Cannot derive the parser because it would cause the span to overflow")]
     ArithmeticOverflow(ArithmeticOverflow),
     #[error("Syntax error in parsing content")]
     SyntaxError(SyntaxError<SpecificError>),

@@ -1,10 +1,11 @@
-use alloc::borrow::Cow;
 use alloc::rc::Rc;
+use bytestring::ByteString;
+use indexmap::IndexMap;
 use std::cell::{Ref, RefCell};
 use std::ops::Deref;
-use indexmap::IndexMap;
+use thiserror::Error;
 
-pub type StringsMap<Token> = IndexMap<alloc::string::String, Token>;
+pub type StringsMap<Token> = IndexMap<ByteString, Token>;
 pub type Strings<Token> = Rc<RefCell<StringsMap<Token>>>;
 
 pub struct TokenGuard<'a, Token> {
@@ -20,63 +21,47 @@ impl<Token> Deref for TokenGuard<'_, Token> {
     }
 }
 
-pub struct SliceGuard<'a, Token> {
-    borrow: Ref<'a, StringsMap<Token>>,
-    index: usize
-}
-
-impl<Token> Deref for SliceGuard<'_, Token> {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.borrow.get_index(self.index).unwrap().0
-    }
-}
-
 #[derive(Debug, Clone, PartialEq)]
-pub struct String<'a, Token> {
+pub struct String<Token> {
     pub(super) strings: Strings<Token>,
-    pub(super) slice: Cow<'a, str>
+    pub(super) slice: ByteString,
+    pub(super) index: Option<usize>
 }
 
-impl<'a, Token> String<'a, Token> {
-    pub fn try_internalize(mut self, on_create: impl FnOnce() -> Option<Token>) -> Option<Intern<Token>> {
-        let cloned_strings = self.strings.clone();
-        let mut strings = cloned_strings.borrow_mut();
-        
-        self.set_owned();
-        let Cow::Owned(string) = self.slice else { unreachable!() };
+#[derive(Debug, Error, PartialEq)]
+#[error("Cannot re-internalize a string")]
+pub struct ReInternalizationError;
 
-        Some(match strings.entry(string) {
-            indexmap::map::Entry::Occupied(mapping) => Intern {
-                strings: self.strings.clone(),
-                index: mapping.index()
+impl<Token> String<Token> {
+    pub fn try_internalize(&mut self, on_create: impl for<'a> FnOnce(&'a str) -> Option<Token>) -> Result<(), ReInternalizationError> {
+        let None = self.index else { return Err(ReInternalizationError) };
+        
+        let mut strings = self.strings.borrow_mut();
+        let index = match strings.entry(self.slice.clone()) {
+            indexmap::map::Entry::Occupied(mapping) => {
+                mapping.index()
             },
             indexmap::map::Entry::Vacant(mapping) => {
                 let index = mapping.index();
-
-                let Some(intern) = on_create() else { return None };
-                let _ = mapping.insert(intern);
-
-                Intern {
-                    strings: self.strings.clone(),
-                    index
-                }
+                let Some(token) = on_create(&self.slice) else { return Ok(()) };
+                let _ = mapping.insert(token);
+                index
             }
-        })
-    }
-    
-    fn set_owned(&mut self) {
-        if let Cow::Borrowed(slice) = self.slice {
-            self.slice = slice.to_string().into();
-        }
+        };
+        
+        self.index = Some(index);
+        Ok(())
     }
     
     pub fn token(&mut self) -> Option<TokenGuard<'_, Token>> {
-        self.set_owned();
-        let Cow::Owned(string) = &self.slice else { unreachable!() };
-        let borrow = self.strings.borrow();
-        let index = borrow.get_full(string)?.0;
+        let borrow = RefCell::borrow(&self.strings);
+        
+        let index = if let Some(index) = self.index {
+            index
+        } else {
+            let index = borrow.get_full(&self.slice)?.0;
+            index
+        };
         
         Some(TokenGuard {
             borrow,
@@ -85,7 +70,7 @@ impl<'a, Token> String<'a, Token> {
     }
 }
 
-impl<Token> Deref for String<'_, Token> {
+impl<Token> Deref for String<Token> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -93,30 +78,8 @@ impl<Token> Deref for String<'_, Token> {
     }
 }
 
-impl<Token> AsRef<str> for String<'_, Token> {
+impl<Token> AsRef<str> for String<Token> {
     fn as_ref(&self) -> &str {
         self
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Intern<Token> {
-    pub(super) strings: Strings<Token>,
-    pub(super) index: usize
-}
-
-impl<Token> Intern<Token> {
-    pub fn token(&self) -> TokenGuard<'_, Token> {
-        TokenGuard {
-            borrow: self.strings.borrow(),
-            index: self.index
-        }
-    }
-    
-    pub fn slice(&self) -> SliceGuard<'_, Token> {
-        SliceGuard {
-            borrow: self.strings.borrow(),
-            index: self.index
-        }
     }
 }

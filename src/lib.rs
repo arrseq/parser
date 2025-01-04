@@ -16,6 +16,7 @@ use core::cell::RefCell;
 use core::iter::Peekable;
 use core::str::Chars;
 use std::ops::{Deref, DerefMut};
+use bytestring::ByteString;
 use indexmap::IndexMap;
 use indexmap::map::Entry;
 use thiserror::Error;
@@ -23,12 +24,12 @@ use crate::error::Error;
 use crate::span::{ArithmeticOverflow, Span};
 
 pub use string::String as ParserString;
-pub use string::Intern as InternString;
+use crate::string::{Strings};
 
 #[derive(Debug)]
 pub struct Node<Supplementary> {
     bounds: Span,
-    source: Rc<str>,
+    source: ByteString,
     supplementary: Supplementary
 }
 
@@ -55,9 +56,9 @@ impl<S> DerefMut for Node<S> {
 #[derive(Debug)]
 pub struct Parser<'a, Token> {
     chars: Rc<RefCell<Peekable<Chars<'a>>>>,
-    source: Rc<str>,
+    source: ByteString,
     span: Span,
-    strings: Rc<RefCell<IndexMap<String, Token>>>,
+    strings: Strings<Token>,
 }
 
 impl<Token> Clone for Parser<'_, Token> {
@@ -110,27 +111,13 @@ impl<'a, Token> Parser<'a, Token> {
         let peeked = *chars.peek().ok_or(ExpectError::Unexpected)?;
         let true = char == peeked else { return Err(ExpectError::Unexpected) };
 
-        Self::expand_internal_character(&mut self.span, peeked);
+        self.span.overflowing_expand(peeked);
         chars.next();
         
         Ok(())
     }
-
-    /// Expand the span by a character that was read from this string that want used to expand this 
-    /// string previously.
-    /// 
-    /// This is ok to do only if the specific instance of that character was used by this function 
-    /// once because
-    /// - The byte length of the span will always be valid because it uses the same type to 
-    ///   index the string
-    /// - The character length will never be larger than the byte length because every characters 
-    ///   byte length is greater than one
-    #[inline]
-    fn expand_internal_character(span: &mut Span, char: char) {
-        span.expand(char).unwrap()
-    }
     
-    pub fn parse_while(&mut self, mut predicate: impl FnMut(char) -> bool) -> ParserString<'_, Token> {
+    pub fn parse_while(&mut self, mut predicate: impl FnMut(char) -> bool) -> ParserString<Token> {
         let mut chars = self.chars.borrow_mut();
         let mut slice_bounds = {
             let byte_end = self.span.byte_end();
@@ -143,33 +130,36 @@ impl<'a, Token> Parser<'a, Token> {
             
             if !predicate(peeked) { break }
             let _ = chars.next();
-            
-            Self::expand_internal_character(&mut self.span, peeked);
+
+            self.span.overflowing_expand(peeked);
             slice_bounds.end += peeked.len_utf8();
         }
         
         ParserString {
             strings: self.strings.clone(),
-            slice: (&self.source.deref()[slice_bounds]).into()
+            slice: (&self.source[slice_bounds]).into(),
+            index: None
         }
     }
     
-    pub fn parse_till_char(&mut self, char: char) -> ParserString<'_, Token> {
+    pub fn parse_till_char(&mut self, char: char) -> ParserString<Token> {
         self.parse_while(|peeked| peeked != char)
     }
     
-    pub fn internalize(&mut self, slice: &str, token: Token) -> Result<InternString<Token>, InternalizeError> {
+    pub fn internalize(&mut self, slice: &str, token: Token) -> Result<ParserString<Token>, InternalizeError> {
         let mut borrow = self.strings.borrow_mut();
-        let Entry::Vacant(entry) = borrow.entry(slice.to_string()) else { return Err(InternalizeError::EntryExists) };
+        let Entry::Vacant(entry) = borrow.entry(slice.into()) else { return Err(InternalizeError::EntryExists) };
         let index = entry.index();
         entry.insert(token);
         
-        Ok(InternString {
+        Ok(ParserString {
             strings: self.strings.clone(),
-            index
+            index: Some(index),
+            slice: slice.into()
         })
     }
     
+    // FIXME: Restore parser if parsing fails
     pub fn parse<Type: Parsable<Token=Token> + 'static>(&mut self, data: &mut Type::Data) -> Result<Node<Type>, Error<Type::Error>> {
         let mut fork = self.derive().map_err(Error::ArithmeticOverflow)?;
         let supplementary = Type::parse(&mut fork, data)?;
@@ -181,6 +171,10 @@ impl<'a, Token> Parser<'a, Token> {
             supplementary,
             source: self.source.clone()
         })
+    }
+    
+    pub fn span(&self) -> &Span {
+        &self.span
     }
 }
 

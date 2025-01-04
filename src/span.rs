@@ -56,8 +56,33 @@ impl Span {
     /// # Usage
     /// Used to include a character that was parsed.
     pub fn expand(&mut self, char: char) -> Result<(), ArithmeticOverflow> {
-        self.add_lengths(self.expanded_lengths(char)?);
+        let lengths = if let Some(byte_length) = self.byte_length.checked_add(char.len_utf8())
+            && let Some(length) = self.length.checked_add(1) {
+            [length, byte_length]
+        } else {
+            return Err(ArithmeticOverflow);
+        };
+        
+        self.add_lengths(lengths);
         Ok(())
+    }
+
+    /// Same method as [Self::expand] but with no error checking and a risk of an overflow
+    /// 
+    /// # Usage
+    /// This is ok to do only if the specific instance of that character was used by this function 
+    /// once because
+    /// - The byte length of the span will always be valid because it uses the same type to 
+    ///   index the string
+    /// - The character length will never be larger than the byte length because every characters 
+    ///   byte length is greater than one
+    pub(super) fn overflowing_expand(&mut self, char: char) {
+        let lengths = [
+            self.byte_length.overflowing_add(char.len_utf8()).0,
+            self.length.overflowing_add(1).0
+        ];
+
+        self.add_lengths(lengths);
     }
     
     /// Add the byte and character length to this span. The result of the calculations are 
@@ -69,23 +94,6 @@ impl Span {
     pub(super) fn add_lengths(&mut self, lengths: [usize; 2]) {
         self.length = self.length.overflowing_add(lengths[0]).0;
         self.byte_length = self.byte_length.overflowing_add(lengths[1]).0;
-    }
-    
-    /// Get the new lengths of this if an extra char was included.
-    /// 
-    /// # Result
-    /// If successful, an array is returned where the first value is the character length and the 
-    /// second is the byte length.
-    /// 
-    /// # Error
-    /// If the expanded form results in an overflow either in the byte or character lengths.
-    pub(super) fn expanded_lengths(&self, char: char) -> Result<[usize; 2], ArithmeticOverflow> {
-        if let Some(byte_length) = self.byte_length.checked_add(char.len_utf8())
-            && let Some(length) = self.length.checked_add(1) {
-            Ok([length, byte_length])
-        } else {
-            Err(ArithmeticOverflow)
-        }
     }
     
     /// Constructs a range type from the byte start and end fields in this span.
