@@ -2,6 +2,8 @@
 name = "xfparser"
 version = "0.1.0"
 edition = "2021"
+description = "intuitive parser api and tooling"
+license = "MIT"
 
 [dependencies]
 bytestring = "1.4.0"
