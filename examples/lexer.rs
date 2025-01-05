@@ -27,7 +27,6 @@ impl Parsable for SomeAst {
 
     fn parse(parser: &mut Parser<Self::Token>, data: &mut Self::Data) -> Result<Self, Error<Self::Error>> {
         let mut ps = parser.parse_while(|c| c.is_alphabetic());
-        println!("got token {:?}", &*ps.token().unwrap());
         ps.try_internalize(|s| Some(Token::Identifier)).unwrap();
         
         Ok(SomeAst {

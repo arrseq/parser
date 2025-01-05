@@ -27,7 +27,7 @@ use crate::span::{ArithmeticOverflow, Span};
 pub use string::String as ParserString;
 use crate::string::{Strings};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Node<Supplementary> {
     bounds: Span,
     source: ByteString,
